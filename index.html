@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>بث مباشر متزامن - المايك والبث</title>
+    <title>بث مباشر - تشغيل تلقائي صامت</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
@@ -40,7 +40,7 @@
     <div class="viewer-badge">● مباشر: <span id="viewerCount">0</span></div>
 
     <div class="video-container">
-        <video id="livePlayer" controls playsinline></video>
+        <video id="livePlayer" controls playsinline muted autoplay></video>
     </div>
 
     <div class="voice-chat-card">
@@ -51,7 +51,7 @@
         <button id="micBtn" onclick="toggleMic()">فتح المايك</button>
     </div>
 
-    <div id="syncStatus" class="status-bar">إضغط Play للمزامنة 🔊</div>
+    <div id="syncStatus" class="status-bar">جاري المزامنة تلقائياً ⚡</div>
 
     <div class="controls-card" id="loginPanel">
         <input type="password" id="passInput" placeholder="أدخل كلمة سر التحكم...">
@@ -120,7 +120,7 @@
                 });
             } catch (e) { alert("افتح صلاحية المايكروفون"); }
         } else {
-            myStream.getTracks().forEach(t => t.stop());
+            if (myStream) myStream.getTracks().forEach(t => t.stop());
             isMicOn = false;
             btn.innerText = "فتح المايك";
             btn.style.background = "var(--primary)";
@@ -135,9 +135,13 @@
             hls = new Hls({ enableWorker: true });
             hls.loadSource(url);
             hls.attachMedia(player);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => player.play().catch(() => {}));
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                // محاولة التشغيل التلقائي الصامت
+                player.play().catch(e => console.log("Autoplay prevented"));
+            });
         } else {
             player.src = url;
+            player.play().catch(e => console.log("Autoplay prevented"));
         }
     }
 
@@ -159,9 +163,17 @@
         if (!d) return;
         isRemoteUpdate = true;
         if (player.src !== d.url) loadVideo(d.url);
+        
+        // مزامنة الوقت والحالة
         if (Math.abs(player.currentTime - d.time) > 3) player.currentTime = d.time;
-        if (d.status === "play" && player.paused) player.play().catch(() => {});
-        else if (d.status === "pause") player.pause();
+        
+        if (d.status === "play") {
+            player.play().catch(() => {
+                statusDiv.innerText = "البث يعمل صامتاً.. اضغط لرفع الصوت 🔊";
+            });
+        } else if (d.status === "pause") {
+            player.pause();
+        }
         setTimeout(() => isRemoteUpdate = false, 1000);
     });
 
