@@ -51,7 +51,7 @@
         <button id="micBtn" onclick="toggleMic()">فتح المايك</button>
     </div>
 
-    <div id="syncStatus" class="status-bar">جاري المزامنة اللحظية...</div>
+    <div id="syncStatus" class="status-bar">جاري المزامنة...</div>
 
     <div class="controls-card" id="loginPanel">
         <input type="password" id="passInput" placeholder="أدخل كلمة سر التحكم...">
@@ -83,6 +83,7 @@
     let hls = null;
     let isAdmin = false;
     let isRemoteUpdate = false;
+    let lastTimestamp = 0; // لحل مشكلة التعليق على وقت قديم
 
     // --- نظام الصوت (PeerJS) ---
     const peer = new Peer();
@@ -127,7 +128,7 @@
         }
     }
 
-    // --- مشغل الفيديو والمزامنة اللحظية ---
+    // --- مشغل الفيديو ---
     function loadVideo(url) {
         if (!url) return;
         if (Hls.isSupported() && url.includes('m3u8')) {
@@ -136,11 +137,11 @@
             hls.loadSource(url);
             hls.attachMedia(player);
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                player.play().catch(() => console.log("Autoplay Muted"));
+                player.play().catch(() => {});
             });
         } else {
             player.src = url;
-            player.play().catch(() => console.log("Autoplay Muted"));
+            player.play().catch(() => {});
         }
     }
 
@@ -154,19 +155,25 @@
 
     function updateGlobalVideo() {
         const url = document.getElementById('urlInput').value;
-        if(url && isAdmin) db.set({ url: url, status: "play", time: 0, timestamp: Date.now() });
+        if(url && isAdmin) {
+            db.set({ url: url, status: "play", time: 0, timestamp: Date.now() });
+        }
     }
 
-    // الاستماع للتحديثات والمزامنة عند الدخول أو التحديث
+    // --- المزامنة الذكية وحل مشكلة التعليق ---
     db.on('value', (s) => {
         const d = s.val();
         if (!d) return;
+
+        // تجاهل التحديثات إذا كان الـ timestamp قديم أو مكرر (يحل مشكلة التعليق)
+        if (d.timestamp && d.timestamp < lastTimestamp) return;
+        lastTimestamp = d.timestamp;
+
         isRemoteUpdate = true;
         
-        // تحميل الفيديو إذا لم يكن محملاً
         if (player.src !== d.url) loadVideo(d.url);
         
-        // المزامنة: القفز للوقت الحالي المخزن لمنع إعادة الفيديو من البداية
+        // القفز للوقت الصحيح فقط إذا كان الفارق أكبر من ثانيتين
         const timeDiff = Math.abs(player.currentTime - d.time);
         if (timeDiff > 2.5) { 
             player.currentTime = d.time; 
@@ -179,16 +186,22 @@
         } else if (d.status === "pause") {
             player.pause();
         }
-        setTimeout(() => isRemoteUpdate = false, 1000);
+        
+        setTimeout(() => { isRemoteUpdate = false; }, 1200);
     });
 
     viewersRef.on('value', (s) => document.getElementById('viewerCount').innerText = s.numChildren() || 0);
 
-    player.onplay = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"play", time:player.currentTime}); };
-    player.onpause = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"pause", time:player.currentTime}); };
+    // المسؤول يحدث البيانات
+    player.onplay = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"play", time:player.currentTime, timestamp: Date.now()}); };
+    player.onpause = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"pause", time:player.currentTime, timestamp: Date.now()}); };
     
-    // المسؤول يحدث الوقت كل 4 ثوانٍ لضمان المزامنة للقادمين الجدد
-    setInterval(() => { if(isAdmin && !player.paused && !isRemoteUpdate) db.update({time:player.currentTime}); }, 4000);
+    setInterval(() => { 
+        if(isAdmin && !player.paused && !isRemoteUpdate) {
+            db.update({time:player.currentTime, timestamp: Date.now()}); 
+        }
+    }, 4000);
+
 </script>
 </body>
 </html>
