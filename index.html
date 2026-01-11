@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>بث مباشر - تشغيل تلقائي صامت</title>
+    <title>بث مباشر متزامن - شامل</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
@@ -51,7 +51,7 @@
         <button id="micBtn" onclick="toggleMic()">فتح المايك</button>
     </div>
 
-    <div id="syncStatus" class="status-bar">جاري المزامنة تلقائياً ⚡</div>
+    <div id="syncStatus" class="status-bar">جاري المزامنة اللحظية...</div>
 
     <div class="controls-card" id="loginPanel">
         <input type="password" id="passInput" placeholder="أدخل كلمة سر التحكم...">
@@ -84,7 +84,7 @@
     let isAdmin = false;
     let isRemoteUpdate = false;
 
-    // --- المحادثة الصوتية ---
+    // --- نظام الصوت (PeerJS) ---
     const peer = new Peer();
     let myStream = null;
     let isMicOn = false;
@@ -127,7 +127,7 @@
         }
     }
 
-    // --- مشغل الفيديو والمزامنة ---
+    // --- مشغل الفيديو والمزامنة اللحظية ---
     function loadVideo(url) {
         if (!url) return;
         if (Hls.isSupported() && url.includes('m3u8')) {
@@ -136,12 +136,11 @@
             hls.loadSource(url);
             hls.attachMedia(player);
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                // محاولة التشغيل التلقائي الصامت
-                player.play().catch(e => console.log("Autoplay prevented"));
+                player.play().catch(() => console.log("Autoplay Muted"));
             });
         } else {
             player.src = url;
-            player.play().catch(e => console.log("Autoplay prevented"));
+            player.play().catch(() => console.log("Autoplay Muted"));
         }
     }
 
@@ -158,14 +157,20 @@
         if(url && isAdmin) db.set({ url: url, status: "play", time: 0, timestamp: Date.now() });
     }
 
+    // الاستماع للتحديثات والمزامنة عند الدخول أو التحديث
     db.on('value', (s) => {
         const d = s.val();
         if (!d) return;
         isRemoteUpdate = true;
+        
+        // تحميل الفيديو إذا لم يكن محملاً
         if (player.src !== d.url) loadVideo(d.url);
         
-        // مزامنة الوقت والحالة
-        if (Math.abs(player.currentTime - d.time) > 3) player.currentTime = d.time;
+        // المزامنة: القفز للوقت الحالي المخزن لمنع إعادة الفيديو من البداية
+        const timeDiff = Math.abs(player.currentTime - d.time);
+        if (timeDiff > 2.5) { 
+            player.currentTime = d.time; 
+        }
         
         if (d.status === "play") {
             player.play().catch(() => {
@@ -181,6 +186,8 @@
 
     player.onplay = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"play", time:player.currentTime}); };
     player.onpause = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"pause", time:player.currentTime}); };
+    
+    // المسؤول يحدث الوقت كل 4 ثوانٍ لضمان المزامنة للقادمين الجدد
     setInterval(() => { if(isAdmin && !player.paused && !isRemoteUpdate) db.update({time:player.currentTime}); }, 4000);
 </script>
 </body>
