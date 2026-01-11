@@ -3,92 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>بث مباشر - محمي</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
+    <title>بث مباشر - احترافي</title>
     <style>
         :root { --primary: #007AFF; --bg: #000000; --card: #1C1C1E; --accent: #32D74B; --danger: #FF3B30; }
-        
-        /* إصلاح اللاق: السماح بالسحب وجعل الارتفاع مرن */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background: var(--bg); color: white; margin: 0; padding: 0;
-            display: flex; flex-direction: column; 
-            min-height: 100vh; 
-            overflow-y: auto; /* يسمح بالسحب العمودي */
-            -webkit-overflow-scrolling: touch; /* سحب ناعم على iOS */
+            display: flex; flex-direction: column; min-height: 100vh; overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
-
         .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100; }
-        
-        /* إزالة القيود التي تسبب تعليق الشاشة */
-        .content { 
-            padding: 15px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
-            flex: none; /* إيقاف التمدد القسري */
-        }
+        .content { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
         
         .video-container {
             position: relative; width: 100%; background: #000; border-radius: 15px; overflow: hidden;
             aspect-ratio: 16 / 9; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            will-change: transform; /* تحسين أداء المعالجة */
         }
         video { width: 100%; height: 100%; object-fit: contain; }
 
-        .controls-card {
-            background: var(--card); padding: 15px; border-radius: 15px;
-            display: flex; flex-direction: column; gap: 12px;
-            margin-bottom: 20px; /* مساحة في الأسفل لسهولة السحب */
+        /* نظام الشات */
+        .chat-container {
+            background: var(--card); border-radius: 15px; display: flex; flex-direction: column; height: 300px;
         }
-        
-        #adminPanel { display: none; border: 1px solid var(--primary); }
+        #chatMessages { flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { background: #2C2C2E; padding: 8px 12px; border-radius: 12px; width: fit-content; max-width: 80%; }
+        .msg-admin { border-right: 3px solid var(--primary); background: #1a2a3a; }
+        .chat-input-area { display: flex; padding: 10px; gap: 8px; border-top: 1px solid #333; }
+        .chat-input-area input { flex: 1; }
 
-        input { 
-            background: #2C2C2E; border: 1px solid #3d3d3d; padding: 12px; border-radius: 10px; 
-            color: white; font-size: 16px; outline: none; -webkit-appearance: none;
-        }
-        button { 
-            background: var(--primary); color: white; border: none; padding: 12px; 
-            border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer;
-        }
-        .status-bar { 
-            font-size: 13px; color: var(--accent); text-align: center; 
-            padding: 10px; background: rgba(50, 215, 75, 0.1); border-radius: 8px;
-        }
-        .viewer-badge {
-            display: inline-block; background: var(--danger); color: white;
-            padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;
-            align-self: center; margin-bottom: 5px;
-        }
+        .controls-card { background: var(--card); padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 12px; }
+        #adminPanel { display: none; border: 1px solid var(--primary); }
+        input { background: #2C2C2E; border: 1px solid #3d3d3d; padding: 12px; border-radius: 10px; color: white; outline: none; }
+        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+        .viewer-badge { display: inline-block; background: var(--danger); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; align-self: center; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h3 style="margin:0;">بث مباشر متزامن 🎬</h3>
-</div>
+<div class="header"><h3 style="margin:0;">بث مباشر متزامن 🎬</h3></div>
 
 <div class="content">
     <div class="viewer-badge">● مباشر: <span id="viewerCount">0</span></div>
 
     <div class="video-container">
-        <video id="livePlayer" controls playsinline webkit-playsinline preload="auto"></video>
+        <video id="livePlayer" controls playsinline webkit-playsinline></video>
     </div>
 
-    <div id="syncStatus" class="status-bar">جاري المزامنة...</div>
+    <div class="chat-container">
+        <div id="chatMessages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="اكتب رسالة...">
+            <button onclick="sendMessage()" style="padding: 0 20px;">إرسال</button>
+        </div>
+    </div>
 
     <div class="controls-card" id="loginPanel">
-        <input type="password" id="passInput" placeholder="أدخل كلمة سر التحكم...">
+        <input type="password" id="passInput" placeholder="كلمة السر...">
         <button onclick="checkPassword()">دخول كمسؤول</button>
     </div>
 
-    <div class="controls-card" id="adminPanel">
-        <div style="color:var(--accent); font-size:12px; font-weight:bold;">مرحباً أيها المسؤول 🔒</div>
-        <input type="url" id="urlInput" placeholder="الصق رابط الفيديو (MP4/M3U8)...">
-        <button onclick="updateGlobalVideo()">تحديث الفيديو عند الجميع</button>
+    <div id="adminPanel" class="controls-card">
+        <div style="color:var(--accent); font-size:12px;">وضع المسؤول نشط (8998) 🔒</div>
+        <input type="url" id="urlInput" placeholder="رابط الفيديو الجديد...">
+        <button onclick="updateGlobalVideo()">تحديث عند الجميع</button>
     </div>
 </div>
 
@@ -108,74 +85,69 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('live_sync');
+    const chatRef = firebase.database().ref('chat');
     const viewersRef = firebase.database().ref('viewers_presence');
-    
     const player = document.getElementById('livePlayer');
-    const statusDiv = document.getElementById('syncStatus');
-    const viewerCountSpan = document.getElementById('viewerCount');
     
-    let isRemoteUpdate = false;
     let isAdmin = false;
+    let isRemoteUpdate = false;
 
-    // عداد المشاهدين
-    const myPresenceRef = viewersRef.push(true);
-    myPresenceRef.onDisconnect().remove();
-    viewersRef.on('value', (snapshot) => {
-        viewerCountSpan.innerText = snapshot.numChildren() || 0;
-    });
-
+    // كلمة السر الجديدة
     function checkPassword() {
-        const pass = document.getElementById('passInput').value;
-        if(pass === "1234") { 
+        if(document.getElementById('passInput').value === "8998") {
             isAdmin = true;
             document.getElementById('loginPanel').style.display = 'none';
             document.getElementById('adminPanel').style.display = 'flex';
-            statusDiv.innerText = "وضع المسؤول نشط ✅";
-        } else {
-            alert("كلمة السر خاطئة!");
+        } else { alert("خطأ!"); }
+    }
+
+    // منع المشاهدين من تقديم/تأخير الفيديو
+    player.onseeking = () => {
+        if (!isAdmin && !isRemoteUpdate) {
+            db.child('time').once('value', (s) => { player.currentTime = s.val(); });
+        }
+    };
+
+    // نظام الشات
+    function sendMessage() {
+        const text = document.getElementById('chatInput').value;
+        if(text) {
+            chatRef.push({ text, admin: isAdmin, time: Date.now() });
+            document.getElementById('chatInput').value = '';
         }
     }
 
+    chatRef.limitToLast(20).on('child_added', (s) => {
+        const m = s.val();
+        const div = document.createElement('div');
+        div.className = `msg ${m.admin ? 'msg-admin' : ''}`;
+        div.innerText = (m.admin ? "⭐ المسؤول: " : "👤: ") + m.text;
+        document.getElementById('chatMessages').appendChild(div);
+        document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+    });
+
+    // العداد والمزامنة (كما في الكود السابق مع الحماية)
+    const myPresenceRef = viewersRef.push(true);
+    myPresenceRef.onDisconnect().remove();
+    viewersRef.on('value', s => { document.getElementById('viewerCount').innerText = s.numChildren(); });
+
     function updateGlobalVideo() {
         const url = document.getElementById('urlInput').value;
-        if(url && isAdmin) {
-            db.set({ url: url, status: "play", time: 0, timestamp: Date.now() });
-        }
+        if(url && isAdmin) db.set({ url, status: "play", time: 0 });
     }
 
     db.on('value', (snapshot) => {
         const data = snapshot.val();
-        if (!data) return;
-
+        if (!data || isAdmin) return; 
         isRemoteUpdate = true;
-
-        if (player.src !== data.url) {
-            player.src = data.url;
-            player.load();
-        }
-
-        if (Math.abs(player.currentTime - data.time) > 3) {
-            player.currentTime = data.time;
-        }
-
-        if (data.status === "play" && player.paused) {
-            player.play().catch(() => { statusDiv.innerText = "إضغط Play للمزامنة 🔊"; });
-        } else if (data.status === "pause" && !player.paused) {
-            player.pause();
-        }
-
-        setTimeout(() => { isRemoteUpdate = false; }, 1000);
+        if (player.src !== data.url) player.src = data.url;
+        if (Math.abs(player.currentTime - data.time) > 2) player.currentTime = data.time;
+        data.status === "play" ? player.play() : player.pause();
+        setTimeout(() => isRemoteUpdate = false, 500);
     });
 
-    player.onplay = () => { if (!isRemoteUpdate && isAdmin) db.update({ status: "play", time: player.currentTime }); };
-    player.onpause = () => { if (!isRemoteUpdate && isAdmin) db.update({ status: "pause", time: player.currentTime }); };
-    
-    setInterval(() => {
-        if (isAdmin && !player.paused && !isRemoteUpdate) {
-            db.update({ time: player.currentTime });
-        }
-    }, 4000);
-
+    // المسؤول يرسل التحديثات
+    setInterval(() => { if(isAdmin && !player.paused) db.update({ time: player.currentTime, status: "play" }); }, 3000);
 </script>
 </body>
 </html>
