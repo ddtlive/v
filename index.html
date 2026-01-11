@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>بث مباشر متزامن مع صوت</title>
+    <title>بث مباشر متزامن - شامل</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
@@ -11,31 +11,39 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
     <style>
-        :root { --primary: #007AFF; --bg: #0b0b0c; --card: #1C1C1E; --accent: #32D74B; --danger: #FF3B30; }
+        :root { --primary: #007AFF; --bg: #000000; --card: #1C1C1E; --accent: #32D74B; --danger: #FF3B30; }
+        
         body { 
-            font-family: -apple-system, system-ui, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background: var(--bg); color: white; margin: 0; padding: 0;
-            display: flex; flex-direction: column; min-height: 100vh; overflow-y: auto;
+            display: flex; flex-direction: column; min-height: 100vh; 
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
         }
+
         .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100; }
         .content { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+        
         .video-container {
             position: relative; width: 100%; background: #000; border-radius: 15px; overflow: hidden;
             aspect-ratio: 16 / 9; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         video { width: 100%; height: 100%; object-fit: contain; }
+
         .controls-card { background: var(--card); padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 12px; }
-        .mic-section { border-left: 4px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
-        input { background: #2C2C2E; border: 1px solid #3d3d3d; padding: 12px; border-radius: 10px; color: white; font-size: 16px; }
-        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:active { opacity: 0.7; }
+        
+        /* قسم المايكروفون الجديد */
+        .voice-chat-card { border-right: 4px solid var(--accent); background: #1c1c1e; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-radius: 12px; }
+
+        input { background: #2C2C2E; border: 1px solid #3d3d3d; padding: 12px; border-radius: 10px; color: white; font-size: 16px; outline: none; }
+        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+        .btn-danger { background: var(--danger); }
         .status-bar { font-size: 13px; color: var(--accent); text-align: center; padding: 10px; background: rgba(50, 215, 75, 0.1); border-radius: 8px; }
         .viewer-badge { background: var(--danger); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; align-self: center; }
     </style>
 </head>
 <body>
 
-<div class="header"><h3>بث مباشر متزامن 🎬</h3></div>
+<div class="header"><h3 style="margin:0;">بث مباشر متزامن 🎬</h3></div>
 
 <div class="content">
     <div class="viewer-badge">● مباشر: <span id="viewerCount">0</span></div>
@@ -44,29 +52,32 @@
         <video id="livePlayer" controls playsinline></video>
     </div>
 
-    <div class="controls-card mic-section">
+    <div class="voice-chat-card">
         <div>
-            <div style="font-weight: bold; font-size: 14px;">المحادثة الصوتية 🎙️</div>
-            <div id="micStatus" style="font-size: 11px; color: #aaa;">المايك مغلق</div>
+            <div style="font-weight: bold;">المحادثة الصوتية 🎙️</div>
+            <div id="micStatus" style="font-size: 11px; color: #888;">المايكروفون مغلق</div>
         </div>
-        <button id="micBtn" onclick="toggleMic()" style="background: var(--danger);">فتح المايك</button>
+        <button id="micBtn" onclick="toggleMic()">فتح المايك</button>
     </div>
 
     <div id="syncStatus" class="status-bar">جاري المزامنة...</div>
 
     <div class="controls-card" id="loginPanel">
-        <input type="password" id="passInput" placeholder="كلمة سر المسؤول...">
-        <button onclick="checkPassword()">دخول المسؤول</button>
+        <input type="password" id="passInput" placeholder="أدخل كلمة سر التحكم...">
+        <button onclick="checkPassword()">دخول كمسؤول</button>
     </div>
 
-    <div class="controls-card" id="adminPanel" style="display:none;">
-        <input type="url" id="urlInput" placeholder="رابط الفيديو (MP4/M3U8)...">
-        <button onclick="updateGlobalVideo()">تحديث عند الجميع</button>
+    <div class="controls-card" id="adminPanel" style="display: none;">
+        <div style="color:var(--accent); font-size:12px; font-weight:bold;">مرحباً أيها المسؤول 🔒</div>
+        <input type="url" id="urlInput" placeholder="الصق رابط الفيديو أو البث المباشر...">
+        <button onclick="updateGlobalVideo()">تحديث الفيديو عند الجميع</button>
     </div>
 </div>
 
-<div id="remoteAudios"></div> <script>
-    // --- 1. إعدادات Firebase ---
+<div id="audioPlayers" style="display:none;"></div>
+
+<script>
+    // إعدادات Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyAjTD-OJBUYewp5bqV0iVh4Rxp5zjBsU54",
         authDomain: "videos-5e336.firebaseapp.com",
@@ -79,72 +90,79 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('live_sync');
     const viewersRef = firebase.database().ref('viewers_presence');
+    
+    const player = document.getElementById('livePlayer');
+    const statusDiv = document.getElementById('syncStatus');
+    const viewerCountSpan = document.getElementById('viewerCount');
+    let hls = null;
+    let isAdmin = false;
+    let isRemoteUpdate = false;
 
-    // --- 2. إعدادات الصوت (PeerJS) ---
-    const peer = new Peer(); 
-    let myStream;
+    // --- نظام المحادثة الصوتية (PeerJS) ---
+    const peer = new Peer();
+    let myStream = null;
     let isMicOn = false;
 
     peer.on('open', (id) => {
-        // تسجيل المستخدم في Firebase مع معرف الصوت الخاص به
         const myPresence = viewersRef.push({ peerId: id });
         myPresence.onDisconnect().remove();
     });
 
-    // استقبال المكالمات الصوتية من الآخرين
     peer.on('call', (call) => {
         call.answer(null); 
         call.on('stream', (remoteStream) => {
             let audio = document.createElement('audio');
             audio.srcObject = remoteStream;
             audio.autoplay = true;
-            document.getElementById('remoteAudios').appendChild(audio);
+            document.getElementById('audioPlayers').appendChild(audio);
         });
     });
 
     async function toggleMic() {
         const btn = document.getElementById('micBtn');
-        const status = document.getElementById('micStatus');
-        
+        const statusText = document.getElementById('micStatus');
         if (!isMicOn) {
             try {
                 myStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 isMicOn = true;
                 btn.innerText = "إغلاق المايك";
-                btn.style.background = "var(--accent)";
-                status.innerText = "صوتك مسموع الآن ✅";
-
-                // الاتصال بجميع الموجودين لإرسال الصوت
+                btn.classList.add('btn-danger');
+                statusText.innerText = "أنت تتحدث الآن...";
+                
                 viewersRef.once('value', (snapshot) => {
                     snapshot.forEach((child) => {
                         const data = child.val();
-                        if (data.peerId && data.peerId !== peer.id) {
-                            peer.call(data.peerId, myStream);
-                        }
+                        if (data.peerId && data.peerId !== peer.id) peer.call(data.peerId, myStream);
                     });
                 });
-            } catch (err) { alert("فشل الوصول للمايكروفون"); }
+            } catch (err) { alert("يرجى السماح بالوصول للمايكروفون"); }
         } else {
-            myStream.getTracks().forEach(track => track.stop());
+            myStream.getTracks().forEach(t => t.stop());
             isMicOn = false;
             btn.innerText = "فتح المايك";
-            btn.style.background = "var(--danger)";
-            status.innerText = "المايك مغلق";
+            btn.classList.remove('btn-danger');
+            statusText.innerText = "المايكروفون مغلق";
         }
     }
 
-    // --- 3. إعدادات الفيديو والمزامنة ---
-    const player = document.getElementById('livePlayer');
-    const statusDiv = document.getElementById('syncStatus');
-    let isAdmin = false;
-    let isRemoteUpdate = false;
+    // --- نظام مزامنة الفيديو ---
+    function loadVideo(url) {
+        if (Hls.isSupported() && (url.includes('m3u8') || url.includes('manifest'))) {
+            if (hls) hls.destroy();
+            hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(player);
+        } else {
+            player.src = url;
+        }
+    }
 
     function checkPassword() {
-        if(document.getElementById('passInput').value === "1234") {
+        if(document.getElementById('passInput').value === "1234") { 
             isAdmin = true;
             document.getElementById('loginPanel').style.display = 'none';
             document.getElementById('adminPanel').style.display = 'flex';
-        }
+        } else { alert("كلمة السر خاطئة!"); }
     }
 
     function updateGlobalVideo() {
@@ -157,27 +175,22 @@
         if (!data) return;
         isRemoteUpdate = true;
 
-        if (player.src !== data.url) {
-            if (Hls.isSupported() && data.url.includes('m3u8')) {
-                const hls = new Hls(); hls.loadSource(data.url); hls.attachMedia(player);
-            } else { player.src = data.url; }
-        }
-
+        if (player.src !== data.url) loadVideo(data.url);
         if (Math.abs(player.currentTime - data.time) > 3) player.currentTime = data.time;
+
         if (data.status === "play" && player.paused) {
             player.play().catch(() => statusDiv.innerText = "إضغط Play للمزامنة 🔊");
-        } else if (data.status === "pause") { player.pause(); }
-
+        } else if (data.status === "pause" && !player.paused) {
+            player.pause();
+        }
         setTimeout(() => isRemoteUpdate = false, 1000);
     });
 
-    // تحديث عدد المشاهدين
-    viewersRef.on('value', (s) => document.getElementById('viewerCount').innerText = s.numChildren() || 0);
+    viewersRef.on('value', (s) => viewerCountSpan.innerText = s.numChildren() || 0);
 
-    // ارسال التحديثات من المسؤول فقط
-    player.onplay = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"play", time: player.currentTime}); };
-    player.onpause = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"pause", time: player.currentTime}); };
-    setInterval(() => { if(isAdmin && !player.paused && !isRemoteUpdate) db.update({time: player.currentTime}); }, 4000);
+    player.onplay = () => { if (!isRemoteUpdate && isAdmin) db.update({ status: "play", time: player.currentTime }); };
+    player.onpause = () => { if (!isRemoteUpdate && isAdmin) db.update({ status: "pause", time: player.currentTime }); };
+    setInterval(() => { if (isAdmin && !player.paused && !isRemoteUpdate) db.update({ time: player.currentTime }); }, 4000);
 </script>
 </body>
 </html>
