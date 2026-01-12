@@ -18,12 +18,17 @@
         .button-group { display: flex; gap: 10px; }
         button { flex: 2; padding: 14px; border-radius: 12px; border: none; background-color: var(--ios-accent); color: white; font-weight: 600; cursor: pointer; }
         button.delete-btn { flex: 1; background-color: rgba(255, 59, 48, 0.2); color: var(--ios-red); }
+        
         .video-wrapper { width: 100%; border-radius: 20px; overflow: hidden; background: #1c1c1e; margin-bottom: 10px; position: relative; }
         video { width: 100%; display: block; }
+        
         .status-badge { font-size: 13px; margin-bottom: 12px; opacity: 0.6; text-align: center; }
         
+        /* أزرار المشاهد */
+        .viewer-tools { display: flex; gap: 10px; width: 100%; }
+        .secondary-btn { background: rgba(255,255,255,0.15); border: 0.5px solid rgba(255,255,255,0.2); font-size: 14px; }
+        
         #adminControls { display: none; }
-        #muteBtn { background: rgba(255,255,255,0.15); border: 0.5px solid rgba(255,255,255,0.2); margin-top: 10px; width: 100%; }
     </style>
 </head>
 <body>
@@ -32,11 +37,14 @@
     <h2>بث متزامن</h2>
     <div id="connectionStatus" class="status-badge">جاري المزامنة...</div>
     
-    <div class="video-wrapper">
+    <div class="video-wrapper" id="videoContainer">
         <video id="video" playsinline muted></video>
     </div>
 
-    <button id="muteBtn" onclick="toggleMute()">🔊 تشغيل الصوت</button>
+    <div class="viewer-tools">
+        <button id="muteBtn" class="secondary-btn" onclick="toggleMute()">🔊 تشغيل الصوت</button>
+        <button class="secondary-btn" onclick="toggleFullScreen()">📺 تكبير الشاشة</button>
+    </div>
 
     <div id="authSection" class="glass-card" style="margin-top: 20px;">
         <input type="password" id="adminPass" placeholder="كلمة سر المتحكم...">
@@ -68,6 +76,7 @@
     const syncRef = database.ref('videoSync');
 
     const video = document.getElementById('video');
+    const videoContainer = document.getElementById('videoContainer');
     const urlInput = document.getElementById('videoUrl');
     const statusBadge = document.getElementById('connectionStatus');
     const muteBtn = document.getElementById('muteBtn');
@@ -76,6 +85,17 @@
     let isRemoteChange = false; 
     let isAdmin = false; 
     const MASTER_PASSWORD = "123"; 
+
+    // وظيفة تكبير الشاشة
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            if (video.requestFullscreen) video.requestFullscreen();
+            else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen(); // لمتصفح ساري
+            else if (video.msRequestFullscreen) video.msRequestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
 
     function toggleMute() {
         video.muted = !video.muted;
