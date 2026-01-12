@@ -3,68 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>بث مباشر متزامن - شامل</title>
-    
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <title>Smart Player - iOS Style</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
     <style>
-        :root { --primary: #007AFF; --bg: #000000; --card: #1C1C1E; --accent: #32D74B; --danger: #FF3B30; }
+        :root {
+            --ios-bg: #000000;
+            --ios-card: rgba(28, 28, 30, 0.8);
+            --ios-accent: #0A84FF; 
+            --ios-red: #FF3B30;   /* أحمر نظام iOS */
+        }
+
         body { 
-            font-family: -apple-system, sans-serif; 
-            background: var(--bg); color: white; margin: 0; padding: 0;
-            display: flex; flex-direction: column; min-height: 100vh; overflow-y: auto;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: var(--ios-bg); 
+            color: white; 
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100; }
-        .content { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
-        .video-container {
-            position: relative; width: 100%; background: #000; border-radius: 15px; overflow: hidden;
-            aspect-ratio: 16 / 9; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+
+        .container { width: 100%; max-width: 600px; }
+
+        h2 { font-weight: 600; font-size: 24px; letter-spacing: -0.5px; margin-bottom: 25px; text-align: center; }
+
+        .glass-card {
+            background: var(--ios-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 0.5px solid rgba(255,255,255,0.1);
         }
-        video { width: 100%; height: 100%; object-fit: contain; }
-        .voice-chat-card { border-right: 4px solid var(--accent); background: var(--card); display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-radius: 12px; }
-        .controls-card { background: var(--card); padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 12px; }
-        input { background: #2C2C2E; border: 1px solid #3d3d3d; padding: 12px; border-radius: 10px; color: white; font-size: 16px; outline: none; }
-        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; }
-        .status-bar { font-size: 13px; color: var(--accent); text-align: center; padding: 10px; background: rgba(50, 215, 75, 0.1); border-radius: 8px; }
-        .viewer-badge { background: var(--danger); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; align-self: center; }
+
+        input { 
+            width: 100%; 
+            padding: 14px; 
+            border-radius: 12px; 
+            border: none; 
+            background: rgba(255,255,255,0.12); 
+            color: white; 
+            font-size: 16px;
+            margin-bottom: 15px;
+            outline: none;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button { 
+            flex: 2;
+            padding: 14px; 
+            border-radius: 12px; 
+            border: none; 
+            background-color: var(--ios-accent); 
+            color: white; 
+            font-size: 16px;
+            font-weight: 600; 
+            transition: 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button.delete-btn {
+            flex: 1;
+            background-color: rgba(255, 59, 48, 0.15);
+            color: var(--ios-red);
+        }
+
+        button:active { transform: scale(0.97); opacity: 0.8; }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #1c1c1e;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        video { width: 100%; display: block; border-radius: 20px; }
+
+        #loader-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 10px;
+            border-radius: 2px;
+            display: none;
+        }
+        #loader-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--ios-accent);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .status-badge { 
+            font-size: 13px; 
+            margin-bottom: 12px; 
+            opacity: 0.7;
+            font-weight: 500;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
-<div class="header"><h3 style="margin:0;">بث مباشر متزامن 🎬</h3></div>
+<div class="container">
+    <h2>التحكم عن بُعد</h2>
+    
+    <div id="connectionStatus" class="status-badge">جاري المزامنة...</div>
 
-<div class="content">
-    <div class="viewer-badge">● مباشر: <span id="viewerCount">0</span></div>
-
-    <div class="video-container">
-        <video id="livePlayer" controls playsinline muted autoplay></video>
+    <div class="video-wrapper">
+        <video id="video" controls playsinline></video>
+    </div>
+    
+    <div id="loader-container">
+        <div id="loader-bar"></div>
     </div>
 
-    <div class="voice-chat-card">
-        <div>
-            <div style="font-weight: bold;">المحادثة الصوتية 🎙️</div>
-            <div id="micStatus" style="font-size: 11px; color: #888;">المايكروفون مغلق</div>
+    <br>
+
+    <div class="glass-card">
+        <input type="text" id="videoUrl" placeholder="أدخل الرابط الجديد هنا...">
+        <div class="button-group">
+            <button onclick="updateDB()">تحديث الرابط</button>
+            <button class="delete-btn" onclick="clearDB()">مسح</button>
         </div>
-        <button id="micBtn" onclick="toggleMic()">فتح المايك</button>
-    </div>
-
-    <div id="syncStatus" class="status-bar">جاري المزامنة...</div>
-
-    <div class="controls-card" id="loginPanel">
-        <input type="password" id="passInput" placeholder="أدخل كلمة سر التحكم...">
-        <button onclick="checkPassword()">دخول كمسؤول</button>
-    </div>
-
-    <div id="adminPanel" class="controls-card" style="display: none;">
-        <input type="url" id="urlInput" placeholder="رابط البث (M3U8/MP4)...">
-        <button onclick="updateGlobalVideo()">تحديث الفيديو عند الجميع</button>
     </div>
 </div>
-
-<div id="audioGroup" style="display:none;"></div>
 
 <script>
     const firebaseConfig = {
@@ -72,136 +149,93 @@
         authDomain: "videos-5e336.firebaseapp.com",
         databaseURL: "https://videos-5e336-default-rtdb.firebaseio.com",
         projectId: "videos-5e336",
+        storageBucket: "videos-5e336.firebasestorage.app",
+        messagingSenderId: "300218651134",
         appId: "1:300218651134:web:4bd24df8e555e62828f0af"
     };
+
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database().ref('live_sync');
-    const viewersRef = firebase.database().ref('viewers_presence');
+    const database = firebase.database();
+    const videoRef = database.ref('currentVideo');
 
-    const player = document.getElementById('livePlayer');
-    const statusDiv = document.getElementById('syncStatus');
-    let hls = null;
-    let isAdmin = false;
-    let isRemoteUpdate = false;
-    let lastTimestamp = 0; // لحل مشكلة التعليق على وقت قديم
+    const video = document.getElementById('video');
+    const loaderContainer = document.getElementById('loader-container');
+    const loaderBar = document.getElementById('loader-bar');
+    const statusBadge = document.getElementById('connectionStatus');
+    const urlInput = document.getElementById('videoUrl');
 
-    // --- نظام الصوت (PeerJS) ---
-    const peer = new Peer();
-    let myStream = null;
-    let isMicOn = false;
-
-    peer.on('open', (id) => {
-        const myPresence = viewersRef.push({ peerId: id });
-        myPresence.onDisconnect().remove();
-    });
-
-    peer.on('call', (call) => {
-        call.answer(null);
-        call.on('stream', (stream) => {
-            const audio = document.createElement('audio');
-            audio.srcObject = stream;
-            audio.autoplay = true;
-            document.getElementById('audioGroup').appendChild(audio);
-        });
-    });
-
-    async function toggleMic() {
-        const btn = document.getElementById('micBtn');
-        if (!isMicOn) {
-            try {
-                myStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                isMicOn = true;
-                btn.innerText = "إغلاق المايك";
-                btn.style.background = "var(--danger)";
-                viewersRef.once('value', (s) => {
-                    s.forEach((c) => {
-                        const d = c.val();
-                        if (d.peerId && d.peerId !== peer.id) peer.call(d.peerId, myStream);
-                    });
-                });
-            } catch (e) { alert("افتح صلاحية المايكروفون"); }
+    videoRef.on('value', (snapshot) => {
+        const url = snapshot.val();
+        if (url && url.trim() !== "") {
+            urlInput.value = url;
+            handleVideoLoad(url);
         } else {
-            if (myStream) myStream.getTracks().forEach(t => t.stop());
-            isMicOn = false;
-            btn.innerText = "فتح المايك";
-            btn.style.background = "var(--primary)";
+            // في حال تم مسح الرابط من القاعدة
+            urlInput.value = "";
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            statusBadge.innerText = "⚠️ لا يوجد رابط محفوظ حالياً";
+            loaderContainer.style.display = 'none';
         }
-    }
-
-    // --- مشغل الفيديو ---
-    function loadVideo(url) {
-        if (!url) return;
-        if (Hls.isSupported() && url.includes('m3u8')) {
-            if (hls) hls.destroy();
-            hls = new Hls({ enableWorker: true });
-            hls.loadSource(url);
-            hls.attachMedia(player);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                player.play().catch(() => {});
-            });
-        } else {
-            player.src = url;
-            player.play().catch(() => {});
-        }
-    }
-
-    function checkPassword() {
-        if(document.getElementById('passInput').value === "1234") {
-            isAdmin = true;
-            document.getElementById('loginPanel').style.display = 'none';
-            document.getElementById('adminPanel').style.display = 'flex';
-        }
-    }
-
-    function updateGlobalVideo() {
-        const url = document.getElementById('urlInput').value;
-        if(url && isAdmin) {
-            db.set({ url: url, status: "play", time: 0, timestamp: Date.now() });
-        }
-    }
-
-    // --- المزامنة الذكية وحل مشكلة التعليق ---
-    db.on('value', (s) => {
-        const d = s.val();
-        if (!d) return;
-
-        // تجاهل التحديثات إذا كان الـ timestamp قديم أو مكرر (يحل مشكلة التعليق)
-        if (d.timestamp && d.timestamp < lastTimestamp) return;
-        lastTimestamp = d.timestamp;
-
-        isRemoteUpdate = true;
-        
-        if (player.src !== d.url) loadVideo(d.url);
-        
-        // القفز للوقت الصحيح فقط إذا كان الفارق أكبر من ثانيتين
-        const timeDiff = Math.abs(player.currentTime - d.time);
-        if (timeDiff > 2.5) { 
-            player.currentTime = d.time; 
-        }
-        
-        if (d.status === "play") {
-            player.play().catch(() => {
-                statusDiv.innerText = "البث يعمل صامتاً.. اضغط لرفع الصوت 🔊";
-            });
-        } else if (d.status === "pause") {
-            player.pause();
-        }
-        
-        setTimeout(() => { isRemoteUpdate = false; }, 1200);
     });
 
-    viewersRef.on('value', (s) => document.getElementById('viewerCount').innerText = s.numChildren() || 0);
-
-    // المسؤول يحدث البيانات
-    player.onplay = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"play", time:player.currentTime, timestamp: Date.now()}); };
-    player.onpause = () => { if(isAdmin && !isRemoteUpdate) db.update({status:"pause", time:player.currentTime, timestamp: Date.now()}); };
-    
-    setInterval(() => { 
-        if(isAdmin && !player.paused && !isRemoteUpdate) {
-            db.update({time:player.currentTime, timestamp: Date.now()}); 
+    async function handleVideoLoad(url) {
+        if (url.includes('.m3u8')) {
+            loaderContainer.style.display = 'none';
+            statusBadge.innerText = "📺 تشغيل بث مباشر...";
+            video.src = url;
+            video.play().catch(() => {});
+        } else {
+            downloadVideo(url);
         }
-    }, 4000);
+    }
 
+    function downloadVideo(url) {
+        loaderContainer.style.display = 'block';
+        loaderBar.style.width = '0%';
+        statusBadge.innerText = "⏳ جاري التحميل (0%)";
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'blob';
+
+        xhr.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                loaderBar.style.width = percent + '%';
+                statusBadge.innerText = `⏳ جاري التحميل (${Math.round(percent)}%)`;
+            }
+        };
+
+        xhr.onload = function() {
+            if (this.status === 200) {
+                video.src = URL.createObjectURL(this.response);
+                statusBadge.innerText = "✅ جاهز للعرض";
+                video.play().catch(() => {});
+                setTimeout(() => loaderContainer.style.display = 'none', 1000);
+            }
+        };
+
+        xhr.send();
+    }
+
+    function updateDB() {
+        const newUrl = urlInput.value.trim();
+        if (newUrl) {
+            videoRef.set(newUrl);
+            statusBadge.innerText = "🔄 جاري التحديث...";
+        }
+    }
+
+    function clearDB() {
+        if (confirm("هل تريد بالتأكيد مسح الرابط المحفوظ؟")) {
+            videoRef.set(""); // مسح القيمة في فايربيس
+            urlInput.value = "";
+            statusBadge.innerText = "🗑️ تم المسح بنجاح";
+        }
+    }
 </script>
+
 </body>
 </html>
