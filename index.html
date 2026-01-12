@@ -13,7 +13,6 @@
         body { font-family: -apple-system, sans-serif; background-color: var(--ios-bg); color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
         .container { width: 100%; max-width: 500px; transition: all 0.5s ease; }
         
-        /* إخفاء العناصر عند تفعيل وضع المشاهد */
         body.viewer-mode .admin-only { display: none; }
         body.viewer-mode h2 { display: none; }
         
@@ -26,37 +25,55 @@
         button { flex: 2; padding: 14px; border-radius: 12px; border: none; background-color: var(--ios-accent); color: white; font-weight: 600; cursor: pointer; }
         button.delete-btn { flex: 1; background-color: rgba(255, 59, 48, 0.2); color: var(--ios-red); }
         
-        .video-wrapper { width: 100%; border-radius: 20px; overflow: hidden; background: #1c1c1e; position: relative; }
-        video { width: 100%; display: block; pointer-events: none; } /* منع التحكم المباشر في الفيديو */
-        
-        /* السماح بالتحكم فقط للمسؤول */
+        /* حاوية الفيديو وزر الصوت */
+        .video-wrapper { width: 100%; border-radius: 20px; overflow: hidden; background: #1c1c1e; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        video { width: 100%; display: block; pointer-events: none; } 
         body.admin-mode video { pointer-events: auto; }
 
-        .auth-section { margin-top: 10px; font-size: 12px; opacity: 0.5; cursor: pointer; text-align: center; }
+        /* زر تشغيل الصوت للمشاهدين */
+        .unmute-banner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--ios-accent);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(10, 132, 255, 0.4);
+            display: none; /* يظهر فقط عند الحاجة */
+        }
+
+        .auth-section { margin-top: 20px; font-size: 13px; opacity: 0.6; cursor: pointer; text-align: center; padding: 10px; }
     </style>
 </head>
-<body class="viewer-mode"> <div class="container">
-    <h2>بث متزامن</h2>
+<body class="viewer-mode">
+
+<div class="container">
+    <h2>بث متزامن (المسؤول)</h2>
     
     <div class="video-wrapper">
+        <div id="unmuteBtn" class="unmute-banner" onclick="enableSound()">🔈 اضغط لتشغيل الصوت</div>
         <video id="video" playsinline muted></video>
     </div>
 
     <div class="glass-card admin-only">
-        <input type="text" id="videoUrl" placeholder="ضع رابط الفيديو هنا...">
+        <input type="text" id="videoUrl" placeholder="رابط البث (m3u8 أو mp4)...">
         <div class="button-group">
-            <button onclick="updateDB()">تحديث الرابط للكل</button>
+            <button onclick="updateDB()">تحديث الرابط للجميع</button>
             <button class="delete-btn" onclick="clearDB()">مسح</button>
         </div>
     </div>
 
     <div id="loginArea" class="auth-section" onclick="askForPass()">
-        🔒 وضع المشاهدة (اضغط للتحكم)
+        🔒 وضع المشاهدة (انقر لإدخال كلمة السر)
     </div>
 </div>
 
 <script>
-    // --- إعدادات Firebase ---
     const firebaseConfig = {
         apiKey: "AIzaSyAjTD-OJBUYewp5bqV0iVh4Rxp5zjBsU54",
         authDomain: "videos-5e336.firebaseapp.com",
@@ -73,28 +90,36 @@
 
     const video = document.getElementById('video');
     const urlInput = document.getElementById('videoUrl');
+    const unmuteBtn = document.getElementById('unmuteBtn');
     let hls = new Hls();
     let isUpdating = false;
     let isAdmin = false;
-    const MASTER_PASS = "Ttt"; // الكلمة السرية هنا
+    const MASTER_PASS = "1234"; // يمكنك تغيير كلمة السر هنا
 
-    // وظيفة التحقق من كلمة السر
+    // تفعيل الصوت
+    function enableSound() {
+        video.muted = false;
+        unmuteBtn.style.display = 'none';
+        video.play().catch(() => {});
+    }
+
+    // التحقق من المسؤول
     function askForPass() {
         const pass = prompt("أدخل كلمة السر للتحكم:");
         if (pass === MASTER_PASS) {
             isAdmin = true;
             document.body.classList.remove('viewer-mode');
             document.body.classList.add('admin-mode');
-            video.controls = true; // إظهار أزرار التحكم للمسؤول فقط
+            video.controls = true; 
             video.muted = false;
-            document.getElementById('loginArea').innerText = "✅ وضع المسؤول نشط";
-            alert("أنت الآن المتحكم في البث");
+            unmuteBtn.style.display = 'none';
+            document.getElementById('loginArea').innerText = "✅ أنت المسؤول الآن";
         } else {
             alert("كلمة سر خاطئة!");
         }
     }
 
-    // 1. الاستماع للتغييرات (للمشاهدين والمسؤول)
+    // مزامنة البيانات
     syncRef.on('value', (snapshot) => {
         if (isUpdating && isAdmin) return;
         const data = snapshot.val();
@@ -108,16 +133,18 @@
             video.currentTime = data.currentTime;
         }
 
-        if (data.isPlaying && video.paused) {
+        if (data.isPlaying) {
             video.play().catch(() => {
-                console.log("الرجاء التفاعل مع الصفحة لتشغيل الصوت");
+                // إذا رفض المتصفح التشغيل بالصوت، نشغله صامتاً ونظهر زر التفعيل
+                video.muted = true;
+                video.play();
+                if (!isAdmin) unmuteBtn.style.display = 'block';
             });
-        } else if (!data.isPlaying && !video.paused) {
+        } else {
             video.pause();
         }
     });
 
-    // 2. إرسال التحديثات (فقط إذا كان المستخدم مسؤولاً)
     function sendSyncUpdate() {
         if (!isAdmin) return; 
         isUpdating = true;
