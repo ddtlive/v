@@ -12,8 +12,8 @@
         :root {
             --ios-bg: #000000;
             --ios-card: rgba(28, 28, 30, 0.85);
-            --ios-accent: #0A84FF; /* لون أبل الأزرق */
-            --ios-red: #FF3B30;   /* لون أبل الأحمر */
+            --ios-accent: #0A84FF;
+            --ios-red: #FF3B30;
         }
 
         body { 
@@ -28,10 +28,8 @@
         }
 
         .container { width: 100%; max-width: 500px; }
-
         h2 { font-weight: 600; font-size: 24px; letter-spacing: -0.5px; margin-bottom: 25px; text-align: center; }
 
-        /* تصميم الكرت الزجاجي */
         .glass-card {
             background: var(--ios-card);
             backdrop-filter: blur(20px);
@@ -43,74 +41,50 @@
         }
 
         input { 
-            width: 100%; 
-            padding: 14px; 
-            border-radius: 12px; 
-            border: none; 
-            background: rgba(255,255,255,0.1); 
-            color: white; 
-            font-size: 16px;
-            margin-bottom: 15px;
-            outline: none;
-            box-sizing: border-box;
-            text-align: center;
+            width: 100%; padding: 14px; border-radius: 12px; border: none; 
+            background: rgba(255,255,255,0.1); color: white; font-size: 16px;
+            margin-bottom: 15px; outline: none; box-sizing: border-box; text-align: center;
         }
 
-        .button-group {
-            display: flex;
-            gap: 10px;
-        }
-
+        .button-group { display: flex; gap: 10px; }
         button { 
-            flex: 2;
-            padding: 14px; 
-            border-radius: 12px; 
-            border: none; 
-            background-color: var(--ios-accent); 
-            color: white; 
-            font-size: 16px;
-            font-weight: 600; 
-            transition: transform 0.2s;
-            -webkit-tap-highlight-color: transparent;
+            flex: 2; padding: 14px; border-radius: 12px; border: none; 
+            background-color: var(--ios-accent); color: white; font-size: 16px;
+            font-weight: 600; transition: transform 0.2s; -webkit-tap-highlight-color: transparent;
         }
-
-        button.delete-btn {
-            flex: 1;
-            background-color: rgba(255, 59, 48, 0.2);
-            color: var(--ios-red);
-        }
-
+        button.delete-btn { flex: 1; background-color: rgba(255, 59, 48, 0.2); color: var(--ios-red); }
         button:active { transform: scale(0.96); opacity: 0.9; }
 
-        /* مشغل الفيديو */
         .video-wrapper {
-            width: 100%;
-            border-radius: 20px;
-            overflow: hidden;
-            background: #1c1c1e;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-            margin-bottom: 10px;
+            width: 100%; border-radius: 20px; overflow: hidden;
+            background: #1c1c1e; box-shadow: 0 20px 40px rgba(0,0,0,0.6); margin-bottom: 10px;
         }
-
         video { width: 100%; display: block; border-radius: 20px; }
 
-        .status-badge { 
-            font-size: 13px; 
-            margin-bottom: 12px; 
-            opacity: 0.6;
-            text-align: center;
+        .status-badge { font-size: 13px; margin-bottom: 12px; opacity: 0.6; text-align: center; }
+
+        /* طبقة التفعيل */
+        #activator {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 999; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         }
     </style>
 </head>
 <body>
 
+<div id="activator" onclick="startSession()">
+    <button style="width: auto; padding: 20px 40px;">اضغط لبدء البث المباشر ⏵</button>
+    <p style="margin-top: 15px; font-size: 14px; opacity: 0.7;">مطلوب لتفعيل الصوت والتشغيل التلقائي</p>
+</div>
+
 <div class="container">
     <h2>التحكم عن بُعد</h2>
-    
     <div id="connectionStatus" class="status-badge">جاري المزامنة مع القاعدة...</div>
 
     <div class="video-wrapper">
-        <video id="video" controls autoplay playsinline></video>
+        <video id="video" controls playsinline muted></video>
     </div>
     
     <div class="glass-card">
@@ -123,7 +97,6 @@
 </div>
 
 <script>
-    // 1. إعدادات Firebase الأصلية
     const firebaseConfig = {
         apiKey: "AIzaSyAjTD-OJBUYewp5bqV0iVh4Rxp5zjBsU54",
         authDomain: "videos-5e336.firebaseapp.com",
@@ -144,7 +117,15 @@
     const statusBadge = document.getElementById('connectionStatus');
     let hls = new Hls();
 
-    // 2. الاستماع للتغييرات (نفس منطق كودك الأول)
+    // وظيفة بدء الجلسة (تفتح الصلاحية للمتصفح لتشغيل أي فيديو لاحقاً)
+    function startSession() {
+        video.play().then(() => {
+            video.pause();
+            video.muted = false; // إلغاء الكتم بعد أخذ الصلاحية
+            document.getElementById('activator').style.display = 'none';
+        }).catch(e => console.log("تحتاج ضغط يدوي أولاً"));
+    }
+
     videoRef.on('value', (snapshot) => {
         const url = snapshot.val();
         if (url && url.trim() !== "") {
@@ -159,7 +140,6 @@
         }
     });
 
-    // 3. وظيفة تشغيل الفيديو الأصلية
     function playVideo(url) {
         hls.destroy();
         if (url.includes('.m3u8')) {
@@ -167,30 +147,29 @@
                 hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(() => video.muted = true && video.play());
+                });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
                 video.play();
             }
         } else {
             video.src = url;
-            video.play().catch(e => console.log("خطأ في التشغيل التلقائي"));
+            video.play().catch(() => {
+                video.muted = true; // إذا فشل بسبب الصوت، يشغل صامت فوراً
+                video.play();
+            });
         }
     }
 
-    // 4. تحديث القاعدة
     function updateDB() {
         const newUrl = urlInput.value.trim();
-        if (newUrl) {
-            videoRef.set(newUrl);
-        }
+        if (newUrl) { videoRef.set(newUrl); }
     }
 
-    // 5. زر المسح الجديد
     function clearDB() {
-        if (confirm("هل تريد مسح الرابط من القاعدة؟")) {
-            videoRef.set("");
-        }
+        if (confirm("هل تريد مسح الرابط من القاعدة؟")) { videoRef.set(""); }
     }
 </script>
 
