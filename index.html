@@ -14,7 +14,8 @@
         .container { width: 100%; max-width: 500px; }
         h2 { font-weight: 600; text-align: center; }
         .glass-card { background: var(--ios-card); backdrop-filter: blur(20px); border-radius: 20px; padding: 20px; border: 0.5px solid rgba(255,255,255,0.1); }
-        input { width: 100%; padding: 14px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: white; margin-bottom: 15px; text-align: center; outline: none; }
+        input { width: 100%; padding: 14px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: white; margin-bottom: 15px; text-align: center; outline: none; box-sizing: border-box; }
+        input:focus { border: 1px solid var(--ios-accent); }
         .button-group { display: flex; gap: 10px; }
         button { flex: 2; padding: 14px; border-radius: 12px; border: none; background-color: var(--ios-accent); color: white; font-weight: 600; cursor: pointer; }
         button.delete-btn { flex: 1; background-color: rgba(255, 59, 48, 0.2); color: var(--ios-red); }
@@ -32,9 +33,11 @@
         <video id="video" controls playsinline muted></video>
     </div>
     <div class="glass-card">
-        <input type="text" id="videoUrl" placeholder="الرابط...">
+        <input type="text" id="videoUrl" placeholder="رابط الفيديو (m3u8 أو mp4)...">
+        <input type="password" id="adminPassword" placeholder="كلمة السر للتحكم...">
+        
         <div class="button-group">
-            <button onclick="updateDB()">تحديث الرابط للكل</button>
+            <button onclick="updateDB()">تحديث للكل</button>
             <button class="delete-btn" onclick="clearDB()">مسح</button>
         </div>
     </div>
@@ -55,48 +58,44 @@
     const database = firebase.database();
     const syncRef = database.ref('videoSync');
 
+    // --- كلمة السر ---
+    const SECRET_PASSWORD = "1234"; 
+
     const video = document.getElementById('video');
     const urlInput = document.getElementById('videoUrl');
+    const passInput = document.getElementById('adminPassword');
     const statusBadge = document.getElementById('connectionStatus');
     let hls = new Hls();
     let isRemoteChange = false; 
 
-    // 1. الاستماع للتغييرات من Firebase
     syncRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (!data) return;
 
-        // تفعيل وضع "التحديث الخارجي" لمنع إرسال البيانات مرة أخرى للقاعدة
         isRemoteChange = true;
 
-        // تحديث الرابط (بدون تشغيل تلقائي)
         if (data.url && video.src !== data.url && !video.src.includes(data.url)) {
             urlInput.value = data.url;
             loadVideo(data.url);
         }
 
-        // مزامنة وقت الفيديو (إذا كان الفرق أكثر من 1.5 ثانية)
         const timeDiff = Math.abs(video.currentTime - data.currentTime);
         if (timeDiff > 1.5) {
             video.currentTime = data.currentTime;
         }
 
-        // مزامنة التشغيل والإيقاف حسب الحالة في القاعدة
         if (data.isPlaying) {
             if (video.paused) video.play().catch(() => {});
         } else {
             if (!video.paused) video.pause();
         }
 
-        // إيقاف وضع "التحديث الخارجي" بعد معالجة البيانات
         setTimeout(() => { isRemoteChange = false; }, 200);
         statusBadge.innerText = "متصل - مزامن";
     });
 
-    // 2. إرسال التحديثات للقاعدة (فقط عند قيام المستخدم بفعل يدوي)
     function sendSyncUpdate() {
         if (isRemoteChange) return; 
-
         syncRef.update({
             currentTime: video.currentTime,
             isPlaying: !video.paused,
@@ -108,7 +107,6 @@
     video.onpause = sendSyncUpdate;
     video.onseeked = sendSyncUpdate;
 
-    // تحديث دوري خفيف لضمان دقة الوقت للمشاهدين الجدد
     setInterval(() => {
         if (!video.paused && !isRemoteChange) {
             syncRef.update({ currentTime: video.currentTime });
@@ -128,26 +126,40 @@
         } else {
             video.src = url;
         }
-        video.pause(); // نضمن أن الفيديو يبدأ متوقفاً
+        video.pause(); 
     }
 
+    // وظيفة التحديث مع التحقق من كلمة السر
     function updateDB() {
+        if (passInput.value !== SECRET_PASSWORD) {
+            alert("كلمة السر غير صحيحة!");
+            return;
+        }
+
         const newUrl = urlInput.value.trim();
         if (newUrl) {
-            // عند إضافة رابط جديد، نضبط isPlaying على false
             syncRef.set({
                 url: newUrl,
                 currentTime: 0,
                 isPlaying: false, 
                 lastUpdated: Date.now()
+            }).then(() => {
+                passInput.value = ""; // مسح الحقل بعد النجاح
             });
         }
     }
 
+    // وظيفة المسح مع التحقق من كلمة السر
     function clearDB() {
+        if (passInput.value !== SECRET_PASSWORD) {
+            alert("كلمة السر غير صحيحة!");
+            return;
+        }
+
         if (confirm("مسح البث عند الجميع؟")) {
-            syncRef.set(null);
-            location.reload(); 
+            syncRef.set(null).then(() => {
+                location.reload(); 
+            });
         }
     }
 </script>
