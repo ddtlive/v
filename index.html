@@ -10,37 +10,53 @@
 
     <style>
         :root { --ios-bg: #000000; --ios-card: rgba(28, 28, 30, 0.85); --ios-accent: #0A84FF; --ios-red: #FF3B30; }
-        body { font-family: -apple-system, sans-serif; background-color: var(--ios-bg); color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 500px; }
-        h2 { font-weight: 600; text-align: center; }
-        .glass-card { background: var(--ios-card); backdrop-filter: blur(20px); border-radius: 20px; padding: 20px; border: 0.5px solid rgba(255,255,255,0.1); }
-        input { width: 100%; padding: 14px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: white; margin-bottom: 15px; text-align: center; outline: none; }
+        body { font-family: -apple-system, sans-serif; background-color: var(--ios-bg); color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+        .container { width: 100%; max-width: 500px; transition: all 0.5s ease; }
+        
+        /* إخفاء العناصر عند تفعيل وضع المشاهد */
+        body.viewer-mode .admin-only { display: none; }
+        body.viewer-mode h2 { display: none; }
+        
+        h2 { font-weight: 600; text-align: center; margin-bottom: 20px; }
+        .glass-card { background: var(--ios-card); backdrop-filter: blur(20px); border-radius: 20px; padding: 20px; border: 0.5px solid rgba(255,255,255,0.1); margin-top: 20px; }
+        
+        input { width: 100%; padding: 14px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: white; margin-bottom: 15px; text-align: center; outline: none; box-sizing: border-box; }
+        
         .button-group { display: flex; gap: 10px; }
         button { flex: 2; padding: 14px; border-radius: 12px; border: none; background-color: var(--ios-accent); color: white; font-weight: 600; cursor: pointer; }
         button.delete-btn { flex: 1; background-color: rgba(255, 59, 48, 0.2); color: var(--ios-red); }
-        .video-wrapper { width: 100%; border-radius: 20px; overflow: hidden; background: #1c1c1e; margin-bottom: 10px; }
-        video { width: 100%; display: block; }
-        .status-badge { font-size: 13px; margin-bottom: 12px; opacity: 0.6; text-align: center; }
+        
+        .video-wrapper { width: 100%; border-radius: 20px; overflow: hidden; background: #1c1c1e; position: relative; }
+        video { width: 100%; display: block; pointer-events: none; } /* منع التحكم المباشر في الفيديو */
+        
+        /* السماح بالتحكم فقط للمسؤول */
+        body.admin-mode video { pointer-events: auto; }
+
+        .auth-section { margin-top: 10px; font-size: 12px; opacity: 0.5; cursor: pointer; text-align: center; }
     </style>
 </head>
-<body>
-
-<div class="container">
+<body class="viewer-mode"> <div class="container">
     <h2>بث متزامن</h2>
-    <div id="connectionStatus" class="status-badge">جاري المزامنة...</div>
+    
     <div class="video-wrapper">
-        <video id="video" controls playsinline muted></video>
+        <video id="video" playsinline muted></video>
     </div>
-    <div class="glass-card">
-        <input type="text" id="videoUrl" placeholder="الرابط...">
+
+    <div class="glass-card admin-only">
+        <input type="text" id="videoUrl" placeholder="ضع رابط الفيديو هنا...">
         <div class="button-group">
             <button onclick="updateDB()">تحديث الرابط للكل</button>
             <button class="delete-btn" onclick="clearDB()">مسح</button>
         </div>
     </div>
+
+    <div id="loginArea" class="auth-section" onclick="askForPass()">
+        🔒 وضع المشاهدة (اضغط للتحكم)
+    </div>
 </div>
 
 <script>
+    // --- إعدادات Firebase ---
     const firebaseConfig = {
         apiKey: "AIzaSyAjTD-OJBUYewp5bqV0iVh4Rxp5zjBsU54",
         authDomain: "videos-5e336.firebaseapp.com",
@@ -53,40 +69,57 @@
 
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
-    const syncRef = database.ref('videoSync'); // مرجع المزامنة الشاملة
+    const syncRef = database.ref('videoSync');
 
     const video = document.getElementById('video');
     const urlInput = document.getElementById('videoUrl');
     let hls = new Hls();
-    let isUpdating = false; // لمنع التكرار اللانهائي عند المزامنة
+    let isUpdating = false;
+    let isAdmin = false;
+    const MASTER_PASS = "1234"; // الكلمة السرية هنا
 
-    // 1. الاستماع للتغييرات من Firebase (الرابط، الوقت، الحالة)
+    // وظيفة التحقق من كلمة السر
+    function askForPass() {
+        const pass = prompt("أدخل كلمة السر للتحكم:");
+        if (pass === MASTER_PASS) {
+            isAdmin = true;
+            document.body.classList.remove('viewer-mode');
+            document.body.classList.add('admin-mode');
+            video.controls = true; // إظهار أزرار التحكم للمسؤول فقط
+            video.muted = false;
+            document.getElementById('loginArea').innerText = "✅ وضع المسؤول نشط";
+            alert("أنت الآن المتحكم في البث");
+        } else {
+            alert("كلمة سر خاطئة!");
+        }
+    }
+
+    // 1. الاستماع للتغييرات (للمشاهدين والمسؤول)
     syncRef.on('value', (snapshot) => {
-        if (isUpdating) return;
+        if (isUpdating && isAdmin) return;
         const data = snapshot.val();
         if (!data) return;
 
-        // تحديث الرابط إذا تغير
         if (data.url && video.src !== data.url && !video.src.includes(data.url)) {
-            urlInput.value = data.url;
             playVideo(data.url);
         }
 
-        // مزامنة وقت الفيديو (إذا كان الفرق أكثر من ثانيتين)
         if (Math.abs(video.currentTime - data.currentTime) > 2) {
             video.currentTime = data.currentTime;
         }
 
-        // مزامنة التشغيل والإيقاف
         if (data.isPlaying && video.paused) {
-            video.play().catch(() => {});
+            video.play().catch(() => {
+                console.log("الرجاء التفاعل مع الصفحة لتشغيل الصوت");
+            });
         } else if (!data.isPlaying && !video.paused) {
             video.pause();
         }
     });
 
-    // 2. إرسال التحديثات للقاعدة عند التقديم أو الإيقاف (من طرفك)
+    // 2. إرسال التحديثات (فقط إذا كان المستخدم مسؤولاً)
     function sendSyncUpdate() {
+        if (!isAdmin) return; 
         isUpdating = true;
         syncRef.update({
             currentTime: video.currentTime,
@@ -95,22 +128,18 @@
         }).then(() => { isUpdating = false; });
     }
 
-    // مراقبة أحداث المشغل لإرسالها لأصدقائك
     video.onplay = sendSyncUpdate;
     video.onpause = sendSyncUpdate;
     video.onseeked = sendSyncUpdate;
 
     function playVideo(url) {
-        hls.destroy();
         if (url.includes('.m3u8')) {
             if (Hls.isSupported()) {
+                hls.destroy();
                 hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
-            } else {
-                video.src = url;
-                video.play();
             }
         } else {
             video.src = url;
@@ -119,6 +148,7 @@
     }
 
     function updateDB() {
+        if (!isAdmin) return;
         const newUrl = urlInput.value.trim();
         if (newUrl) {
             syncRef.set({
@@ -131,7 +161,7 @@
     }
 
     function clearDB() {
-        if (confirm("مسح البث عند الجميع؟")) syncRef.set(null);
+        if (isAdmin && confirm("مسح البث عند الجميع؟")) syncRef.set(null);
     }
 </script>
 </body>
