@@ -41,7 +41,7 @@
 </div>
 
 <script>
-    const passwordSecret = "1234"; // يمكنك تغيير كلمة السر من هنا
+    const passwordSecret = "1234"; 
     let isAuthorized = false;
 
     const firebaseConfig = {
@@ -64,7 +64,6 @@
     let hls = new Hls();
     let isRemoteChange = false; 
 
-    // نظام التحقق من كلمة السر في حقل الإدخال
     urlInput.addEventListener('input', () => {
         if (!isAuthorized && urlInput.value === passwordSecret) {
             isAuthorized = true;
@@ -82,7 +81,6 @@
         isRemoteChange = true;
 
         if (data.url && video.src !== data.url && !video.src.includes(data.url)) {
-            // لا يتم الكتابة في الحقل إذا كان المستخدم غير مصرح له (لحمايته)
             if(isAuthorized) urlInput.value = data.url;
             loadVideo(data.url);
         }
@@ -98,7 +96,7 @@
             if (!video.paused) video.pause();
         }
 
-        setTimeout(() => { isRemoteChange = false; }, 200);
+        setTimeout(() => { isRemoteChange = false; }, 300);
         statusBadge.innerText = "متصل - مزامن";
     });
 
@@ -114,6 +112,25 @@
     video.onplay = sendSyncUpdate;
     video.onpause = sendSyncUpdate;
     video.onseeked = sendSyncUpdate;
+
+    // حل مشكلة التوقف عند الرجوع من الفل سكرين
+    const handleExitFullScreen = () => {
+        const isFullScreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+        if (!isFullScreen) {
+            // فحص حالة التشغيل في القاعدة لإعادة التشغيل إذا لزم الأمر
+            syncRef.once('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.isPlaying && video.paused) {
+                    video.play().catch(() => {});
+                }
+            });
+        }
+    };
+
+    document.addEventListener('fullscreenchange', handleExitFullScreen);
+    document.addEventListener('webkitfullscreenchange', handleExitFullScreen);
+    document.addEventListener('mozfullscreenchange', handleExitFullScreen);
+    document.addEventListener('MSFullscreenChange', handleExitFullScreen);
 
     setInterval(() => {
         if (!video.paused && !isRemoteChange) {
